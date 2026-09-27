@@ -1,4 +1,4 @@
-name: GitHub Clone Count Update Everyday
+name: GitHub Clone Count *Daily*
 
 on:
   schedule:
@@ -22,32 +22,24 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/traffic/clones \
             > clone.json
 
-      - name: create gist and download previous count
-        id: set_id
+      - name: download previous count from gist
         run: |
-          if gh secret list | grep -q "GIST_ID"
-          then
-              echo "GIST_ID found"
-              echo "GIST=${{ secrets.GIST_ID }}" >> $GITHUB_OUTPUT
-              curl --user "${{ github.actor }}:${{ secrets.SECRET_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/gists/${{ secrets.GIST_ID }} \
-              > previous_clone.json
-          else
-              echo "GIST_ID not found"
-              gh gist create clone.json
-          fi
+          curl -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/gists/${{ secrets.GIST_ID }} \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['files']['clone.json']['content'])" \
+            > clone_before.json
 
       - name: update clone.json
         run: |
           curl https://raw.githubusercontent.com/MShawon/github-clone-count-badge/master/main.py > main.py
           python3 main.py
 
-      - name: Update gist with latest count
+      - name: update gist with latest count
         run: |
-          content=$(sed 's/\\/\\\\/g' clone.json | sed 's/"/\\"/g' | sed 's/$/\\n/' | tr -d '\n')
+          content=$(cat clone.json | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)))")
           curl -X PATCH \
-          --user "${{ github.actor }}:${{ secrets.SECRET_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/gists/${{ steps.set_id.outputs.GIST }} \
-          -d "{\"files\":{\"clone.json\":{\"content\":\"$content\"}}}"
+            -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/gists/${{ secrets.GIST_ID }} \
+            -d "{\"files\":{\"clone.json\":{\"content\":$(echo $content | python3 -c \"import sys,json; print(json.dumps(sys.stdin.read()))\")}}"

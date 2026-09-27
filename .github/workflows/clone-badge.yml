@@ -27,7 +27,7 @@ jobs:
           curl -s \
             -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/gists/${{ secrets.GIST_ID }}" \
+            "https://api.github.com/gists/f2a55856d3621bfe2e1ae3aa56a4a297" \
             > gist_response.json
           echo "gist response:" && cat gist_response.json
           python3 -c "
@@ -74,6 +74,6 @@ jobs:
           curl -s -X PATCH \
             -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/gists/${{ secrets.GIST_ID }}" \
+            "https://api.github.com/gists/f2a55856d3621bfe2e1ae3aa56a4a297" \
             -d "{\"files\":{\"clone.json\":{\"content\":$(python3 -c \"import json,sys; print(json.dumps(open('clone.json').read()))\")}}"
           echo "done"

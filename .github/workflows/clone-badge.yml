@@ -32,25 +32,37 @@ jobs:
       - name: update count
         run: |
           python3 - <<'EOF'
-          import json
+          import json, os
+          from datetime import datetime, timezone
 
           with open('current.json') as f:
               current = json.load(f)
 
-          try:
-              with open('previous.json') as f:
-                  previous = json.load(f)
-              prev_count = previous.get('count', 70)
-              prev_unique = previous.get('unique', 47)
-          except Exception as e:
-              print(f'Could not read previous.json, using defaults: {e}')
-              prev_count = 70
-              prev_unique = 47
+          with open('previous.json') as f:
+              previous = json.load(f)
 
-          new_count = prev_count + current.get('count', 0)
-          new_unique = prev_unique + current.get('uniques', 0)
+          prev_count = previous.get('count', 70)
+          prev_unique = previous.get('unique', 47)
+          last_timestamp = previous.get('last_timestamp', None)
 
-          result = {'count': new_count, 'unique': new_unique}
+          # only count clones newer than last run
+          new_count = 0
+          new_unique = 0
+          latest_timestamp = last_timestamp
+
+          for entry in current.get('clones', []):
+              ts = entry['timestamp']
+              if last_timestamp is None or ts > last_timestamp:
+                  new_count += entry['count']
+                  new_unique += entry['uniques']
+                  if latest_timestamp is None or ts > latest_timestamp:
+                      latest_timestamp = ts
+
+          result = {
+              'count': prev_count + new_count,
+              'unique': prev_unique + new_unique,
+              'last_timestamp': latest_timestamp
+          }
           print('new totals:', result)
 
           with open('clone.json', 'w') as f:

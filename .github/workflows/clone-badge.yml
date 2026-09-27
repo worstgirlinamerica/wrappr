@@ -70,10 +70,17 @@ jobs:
 
       - name: push to gist
         run: |
-          content=$(cat clone.json)
-          curl -s -X PATCH \
-            -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/gists/f2a55856d3621bfe2e1ae3aa56a4a297" \
-            -d "{\"files\":{\"clone.json\":{\"content\":$(python3 -c \"import json,sys; print(json.dumps(open('clone.json').read()))\")}}"
-          echo "done"
+          python3 -c "
+          import json, urllib.request
+          content = open('clone.json').read()
+          data = json.dumps({'files': {'clone.json': {'content': content}}}).encode()
+          req = urllib.request.Request(
+              'https://api.github.com/gists/f2a55856d3621bfe2e1ae3aa56a4a297',
+              data=data,
+              method='PATCH'
+          )
+          req.add_header('Authorization', 'token ${{ secrets.SECRET_TOKEN }}')
+          req.add_header('Accept', 'application/vnd.github.v3+json')
+          res = urllib.request.urlopen(req)
+          print('done:', res.status)
+          "

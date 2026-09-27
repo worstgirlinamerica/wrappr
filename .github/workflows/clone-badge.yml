@@ -20,8 +20,7 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/traffic/clones \
             > current.json
-          echo "Current clones:"
-          cat current.json
+          echo "current:" && cat current.json
 
       - name: get previous count from gist
         run: |
@@ -29,14 +28,17 @@ jobs:
             -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/gists/${{ secrets.GIST_ID }}" \
-            | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
+            > gist_response.json
+          echo "gist response:" && cat gist_response.json
+          python3 -c "
+          import json
+          with open('gist_response.json') as f:
+              data = json.load(f)
           content = data['files']['clone.json']['content']
-          print(content)
-          " > previous.json
-          echo "Previous count:"
-          cat previous.json
+          with open('previous.json', 'w') as f:
+              f.write(content)
+          print('previous:', content)
+          "
 
       - name: update count
         run: |
@@ -46,17 +48,21 @@ jobs:
           with open('current.json') as f:
               current = json.load(f)
 
-          with open('previous.json') as f:
-              previous = json.load(f)
-
-          prev_count = previous.get('count', 70)
-          prev_unique = previous.get('unique', 47)
+          try:
+              with open('previous.json') as f:
+                  previous = json.load(f)
+              prev_count = previous.get('count', 70)
+              prev_unique = previous.get('unique', 47)
+          except Exception as e:
+              print(f'Could not read previous.json, using defaults: {e}')
+              prev_count = 70
+              prev_unique = 47
 
           new_count = prev_count + current.get('count', 0)
           new_unique = prev_unique + current.get('uniques', 0)
 
           result = {'count': new_count, 'unique': new_unique}
-          print('New totals:', result)
+          print('new totals:', result)
 
           with open('clone.json', 'w') as f:
               json.dump(result, f)
@@ -64,9 +70,10 @@ jobs:
 
       - name: push to gist
         run: |
-          content=$(python3 -c "import json; print(json.dumps(json.load(open('clone.json'))))")
+          content=$(cat clone.json)
           curl -s -X PATCH \
             -H "Authorization: token ${{ secrets.SECRET_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/gists/${{ secrets.GIST_ID }}" \
-            -d "{\"files\":{\"clone.json\":{\"content\":\"$content\"}}}"
+            -d "{\"files\":{\"clone.json\":{\"content\":$(python3 -c \"import json,sys; print(json.dumps(open('clone.json').read()))\")}}"
+          echo "done"
